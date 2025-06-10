@@ -1,26 +1,74 @@
-import { Injectable } from '@nestjs/common';
-import { CreateAuthDto } from './dto/create-auth.dto';
-import { UpdateAuthDto } from './dto/update-auth.dto';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import { UserService } from '../user/user.service';
+import { LoginDto } from './dto/login.dto';
+import { CreateUserDto } from '../user/dto/create-user.dto';
 
 @Injectable()
 export class AuthService {
-  create(createAuthDto: CreateAuthDto) {
-    return 'This action adds a new auth';
+  constructor(
+    private userService: UserService,
+    private jwtService: JwtService,
+  ) {}
+
+  async register(createUserDto: CreateUserDto) {
+    const user = await this.userService.create(createUserDto);
+    const token = this.generateToken(user);
+    
+    return {
+      user: {
+        id: user._id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+      },
+      token,
+    };
   }
 
-  findAll() {
-    return `This action returns all auth`;
+  async login(loginDto: LoginDto) {
+    try {
+      const user = await this.userService.validateUser(
+        loginDto.email,
+        loginDto.password,
+      );
+
+
+      const token = this.generateToken(user);
+
+      return {
+        user: {
+          id: user._id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          role: user.role,
+        },
+        token,
+      };
+    } catch (error) {
+      throw new UnauthorizedException('Credenciales inválidas');
+    }
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} auth`;
+  private generateToken(user: any) {
+    const payload = {
+      sub: user._id,
+      email: user.email,
+      role: user.role,
+    };
+
+    return this.jwtService.sign(payload);
   }
 
-  update(id: number, updateAuthDto: UpdateAuthDto) {
-    return `This action updates a #${id} auth`;
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} auth`;
+  async validateToken(token: string) {
+    try {
+      const payload = this.jwtService.verify(token);
+      const user = await this.userService.findOne(payload.sub);
+      return user;
+    } catch (error) {
+      throw new UnauthorizedException('Token inválido');
+    }
   }
 }
