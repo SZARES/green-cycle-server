@@ -18,6 +18,8 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
             throw new UnauthorizedException('Token no proporcionado');
         }
 
+        // console.log("token", token);
+
         const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
             context.getHandler(),
             context.getClass(),
