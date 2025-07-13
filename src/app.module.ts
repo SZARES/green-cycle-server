@@ -11,6 +11,7 @@ import { getMongoConfig } from './CONFIGURATION';
 import { CategoriesModule } from './categories/categories.module';
 import { SeederModule } from './seeder/seeder.module';
 import { OrdersModule } from './orders/orders.module';
+import { UploadModule } from './upload/upload.module';
 
 @Module({
   imports: [
@@ -26,7 +27,8 @@ import { OrdersModule } from './orders/orders.module';
     ChatsModule,
     CategoriesModule,
     SeederModule,
-    OrdersModule
+    OrdersModule,
+    UploadModule
   ],
   controllers: [AppController],
   providers: [AppService],

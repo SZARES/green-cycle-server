@@ -5,18 +5,67 @@ import { Product } from './entities/product.entity';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductStatus } from './entities/product.entity';
+import { UploadService } from '../upload/upload.service';
 
 @Injectable()
 export class ProductsService {
   constructor(
     @InjectModel(Product.name) private productModel: Model<Product>,
+    private uploadService: UploadService,
   ) {}
 
   async create(createProductDto: CreateProductDto) {
     try {
+      // Validar que las imágenes sean URLs válidas de Cloudinary
+      if (createProductDto.images && createProductDto.images.length > 0) {
+        for (const imageUrl of createProductDto.images) {
+          if (!this.uploadService.isCloudinaryUrl(imageUrl)) {
+            throw new BadRequestException('Las imágenes deben ser URLs válidas de Cloudinary');
+          }
+        }
+      }
+
       const product = new this.productModel(createProductDto);
       return await product.save();
     } catch (error) {
+      if (error.code === 11000) {
+        throw new BadRequestException('Ya existe un producto con ese slug');
+      }
+      throw error;
+    }
+  }
+
+  async createWithImages(createProductDto: CreateProductDto, files: Express.Multer.File[]) {
+    try {
+      // Subir imágenes a Cloudinary
+      const imageUrls = await this.uploadService.uploadMultipleImages(files);
+      
+      // Asignar las URLs de las imágenes al DTO
+      createProductDto.images = imageUrls;
+      
+      // Crear el producto
+      const product = new this.productModel(createProductDto);
+      const savedProduct = await product.save();
+      
+      return {
+        success: true,
+        message: 'Producto creado exitosamente con imágenes',
+        product: savedProduct,
+        uploadedImages: imageUrls.length
+      };
+    } catch (error) {
+      // Si hay error, intentar eliminar las imágenes subidas
+      if (createProductDto.images && createProductDto.images.length > 0) {
+        try {
+          const publicIds = createProductDto.images.map(url => 
+            this.uploadService.getPublicIdFromUrl(url)
+          );
+          await this.uploadService.deleteMultipleImages(publicIds);
+        } catch (deleteError) {
+          console.error('Error al eliminar imágenes después de fallo:', deleteError);
+        }
+      }
+      
       if (error.code === 11000) {
         throw new BadRequestException('Ya existe un producto con ese slug');
       }
