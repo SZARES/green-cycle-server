@@ -6,12 +6,14 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductStatus } from './entities/product.entity';
 import { UploadService } from '../upload/upload.service';
+import { CategoriesService } from 'src/categories/categories.service';
 
 @Injectable()
 export class ProductsService {
   constructor(
     @InjectModel(Product.name) private productModel: Model<Product>,
     private uploadService: UploadService,
+    private categoriesService: CategoriesService
   ) {}
 
   async create(createProductDto: CreateProductDto) {
@@ -35,16 +37,32 @@ export class ProductsService {
     }
   }
 
-  async createWithImages(createProductDto: CreateProductDto, files: Express.Multer.File[]) {
+  async createWithImages(createProductDto: CreateProductDto, files: Express.Multer.File[], seller) {
     try {
       // Subir imágenes a Cloudinary
       const imageUrls = await this.uploadService.uploadMultipleImages(files);
       
       // Asignar las URLs de las imágenes al DTO
-      createProductDto.images = imageUrls;
       
       // Crear el producto
-      const product = new this.productModel(createProductDto);
+      // console.log(createProductDto);
+      // return;
+      
+      // let p = JSON.parse(createProductDto);
+      
+      const product = new this.productModel();
+      
+      let obj: any = createProductDto;
+      
+      for(let name in JSON.parse(obj)) {
+        product[name] = JSON.parse(obj)[name];
+      }
+      product.images = imageUrls;
+      product.seller = seller;
+
+      
+      // product.images = imageUrls;
+      // product.set('images', imageUrls)
       const savedProduct = await product.save();
       
       return {

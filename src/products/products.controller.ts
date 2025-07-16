@@ -4,6 +4,16 @@ import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { IsObject } from 'class-validator';
+
+
+class CraeteProductFileDto {
+  @IsObject()
+  productData: CreateProductDto;
+
+
+}
+
 
 @Controller('products')
 export class ProductsController {
@@ -33,14 +43,24 @@ export class ProductsController {
     },
   }))
   async createWithImages(
-    @UploadedFiles() files: Express.Multer.File[],
-    @Body() createProductDto: CreateProductDto,
+    @UploadedFiles() images: Express.Multer.File[],
+    @Body() createProductDto: CraeteProductFileDto,
     @Request() req
   ) {
     // Asignar el vendedor automáticamente desde el token JWT
-    createProductDto.seller = req.user.id;
-    
-    return this.productsService.createWithImages(createProductDto, files);
+    // console.log(req.user.id);
+    // let d: any = JSON.parse(JSON.stringify(createProductDto.productData));
+    // let product: any = structuredClone(d);
+    // product.seller = req.user.id;
+    // console.log(product);
+    // return;
+    // let p = {
+    //   ...product,
+    //   seller: req.user.id
+    // }
+
+    return this.productsService.createWithImages(createProductDto.productData, images, req.user.id);
+    // return "1231231";
   }
 
   @Get()

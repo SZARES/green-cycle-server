@@ -33,8 +33,10 @@ export class Product extends Document {
   @Prop({ type: [String], required: true, min: 1, max: 10 })
   images: string[];
 
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Category', required: true })
-  category: Category;
+  // @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Category', required: true })
+  // category: Category;
+  @Prop({ required: true})
+  category: string
 
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Category' })
   subcategory?: Category;

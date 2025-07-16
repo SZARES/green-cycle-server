@@ -153,7 +153,8 @@ export class CreateProductDto {
   condition: ProductCondition;
 
   @IsMongoId()
-  seller: string;
+  @IsOptional()
+  seller: any;
 
   @IsBoolean()
   @IsOptional()
