@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseInterceptors, UploadedFiles, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseInterceptors, UploadedFiles, UseGuards, Request, Query, ForbiddenException } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
@@ -21,8 +21,9 @@ export class ProductsController {
 
   @Post()
   @UseGuards(JwtAuthGuard)
-  create(@Body() createProductDto: CreateProductDto) {
-    return this.productsService.create(createProductDto);
+  create(@Body() createProductDto: CreateProductDto, @Request() req) {
+    // Asignar el vendedor automáticamente desde el token JWT
+    return this.productsService.create({ ...createProductDto, seller: req.user.id });
   }
 
   @Post('with-images')
@@ -64,24 +65,60 @@ export class ProductsController {
   }
 
   @Get()
-  findAll() {
-    return this.productsService.findAll();
+  findAll(@Query() query: any) {
+    return this.productsService.findAll(query);
+  }
+
+  @Get('my-products')
+  @UseGuards(JwtAuthGuard)
+  findMyProducts(@Query() query: any, @Request() req) {
+    // Obtener todos los productos del usuario autenticado (incluyendo archivados)
+    return this.productsService.findAllBySeller(req.user.id, query);
+  }
+
+  @Get('seller/:sellerId')
+  @UseGuards(JwtAuthGuard)
+  findBySeller(
+    @Param('sellerId') sellerId: string,
+    @Query() query: any,
+    @Request() req
+  ) {
+    // Verificar que el usuario solo pueda ver sus propios productos
+    if (req.user.id !== sellerId) {
+      throw new ForbiddenException('No tienes permisos para ver los productos de otro usuario');
+    }
+    return this.productsService.findBySeller(sellerId, query);
   }
 
   @Get(':id')
   findOne(@Param('id') id: string) {
+    // Este endpoint es público para que cualquiera pueda ver productos
     return this.productsService.findOne(id);
   }
 
   @Patch(':id')
   @UseGuards(JwtAuthGuard)
-  update(@Param('id') id: string, @Body() updateProductDto: UpdateProductDto) {
+  async update(@Param('id') id: string, @Body() updateProductDto: UpdateProductDto, @Request() req) {
+    // Verificar que el producto pertenece al usuario antes de actualizarlo
+    const product = await this.productsService.findOneInternal(id);
+    
+    if (product.seller.toString() !== req.user.id) {
+      throw new ForbiddenException('No tienes permisos para modificar este producto. Solo puedes modificar tus propios productos');
+    }
+    
     return this.productsService.update(id, updateProductDto);
   }
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard)
-  remove(@Param('id') id: string) {
+  async remove(@Param('id') id: string, @Request() req) {
+    // Verificar que el producto pertenece al usuario antes de eliminarlo
+    const product = await this.productsService.findOneInternal(id);
+    
+    if (product.seller.toString() !== req.user.id) {
+      throw new ForbiddenException('No tienes permisos para eliminar este producto. Solo puedes eliminar tus propios productos');
+    }
+    
     return this.productsService.remove(id);
   }
 }

@@ -18,7 +18,7 @@ export class ProductsService {
 
   async create(createProductDto: CreateProductDto) {
     try {
-      // Validar que las imágenes sean URLs válidas de Cloudinary
+      // Validar que las imágenes sean URLs válidas de Cloudinary si se proporcionan
       if (createProductDto.images && createProductDto.images.length > 0) {
         for (const imageUrl of createProductDto.images) {
           if (!this.uploadService.isCloudinaryUrl(imageUrl)) {
@@ -116,6 +116,9 @@ export class ProductsService {
     }
     if (status) {
       filter.status = status;
+    } else {
+      // Por defecto, excluir productos archivados
+      filter.status = { $ne: ProductStatus.ARCHIVED };
     }
     if (minPrice || maxPrice) {
       filter.price = {};
@@ -178,7 +181,10 @@ export class ProductsService {
 
   async findOne(id: string) {
     const product = await this.productModel
-      .findById(id)
+      .findOne({ 
+        _id: id,
+        status: { $ne: ProductStatus.ARCHIVED }
+      })
       .populate('category', 'name slug')
       .populate('subcategory', 'name slug')
       .populate('seller', 'name email');
@@ -196,9 +202,23 @@ export class ProductsService {
     return product;
   }
 
+  // Método interno para verificar propiedad sin incrementar vistas
+  async findOneInternal(id: string) {
+    const product = await this.productModel.findById(id);
+
+    if (!product) {
+      throw new NotFoundException(`Producto con ID ${id} no encontrado`);
+    }
+
+    return product;
+  }
+
   async findBySlug(slug: string) {
     const product = await this.productModel
-      .findOne({ slug })
+      .findOne({ 
+        slug,
+        status: { $ne: ProductStatus.ARCHIVED }
+      })
       .populate('category', 'name slug')
       .populate('subcategory', 'name slug')
       .populate('seller', 'name email');
@@ -259,7 +279,7 @@ export class ProductsService {
 
     const filter = {
       category: new Types.ObjectId(categoryId),
-      status: ProductStatus.ACTIVE,
+      status: { $ne: ProductStatus.ARCHIVED },
     };
 
     const [products, total] = await Promise.all([
@@ -282,6 +302,35 @@ export class ProductsService {
   }
 
   async findBySeller(sellerId: string, query: any = {}) {
+    const { page = 1, limit = 10, sort = '-createdAt' } = query;
+    const skip = (Number(page) - 1) * Number(limit);
+
+    const filter = {
+      seller: new Types.ObjectId(sellerId),
+      status: { $ne: ProductStatus.ARCHIVED },
+    };
+
+    const [products, total] = await Promise.all([
+      this.productModel
+        .find(filter)
+        .sort(sort)
+        .skip(skip)
+        .limit(Number(limit))
+        .populate('category', 'name slug')
+        .populate('subcategory', 'name slug'),
+      this.productModel.countDocuments(filter),
+    ]);
+
+    return {
+      products,
+      total,
+      page: Number(page),
+      totalPages: Math.ceil(total / Number(limit)),
+    };
+  }
+
+  // Método para obtener todos los productos del vendedor (incluyendo archivados)
+  async findAllBySeller(sellerId: string, query: any = {}) {
     const { page = 1, limit = 10, sort = '-createdAt' } = query;
     const skip = (Number(page) - 1) * Number(limit);
 
