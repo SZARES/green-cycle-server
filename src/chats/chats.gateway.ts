@@ -11,6 +11,8 @@ import { Server, Socket } from 'socket.io';
 import { UseGuards } from '@nestjs/common';
 import { WsJwtGuard } from '../auth/guards/ws-jwt.guard';
 import { ChatsService } from './chats.service';
+import { MessagesService } from './messages.service';
+import { JwtService } from '@nestjs/jwt';
 
 @WebSocketGateway({
   cors: {
@@ -24,7 +26,11 @@ export class ChatsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   private userSockets: Map<string, Socket[]> = new Map();
 
-  constructor(private readonly chatsService: ChatsService) {}
+  constructor(
+    private readonly chatsService: ChatsService,
+    private readonly messagesService: MessagesService,
+    private readonly jwtService: JwtService,
+  ) {}
 
   async handleConnection(client: Socket) {
     try {
@@ -34,8 +40,17 @@ export class ChatsGateway implements OnGatewayConnection, OnGatewayDisconnect {
         return;
       }
 
-      // Aquí deberías validar el token y obtener el userId
-      const userId = 'userId'; // Reemplazar con la lógica real de validación
+      // Validar el token y obtener el userId
+      const payload = this.jwtService.verify(token);
+      const userId = payload.sub || payload.id;
+      
+      if (!userId) {
+        client.disconnect();
+        return;
+      }
+
+      // Guardar el userId en el cliente para usarlo posteriormente
+      (client as any).userId = userId;
       this.addUserSocket(userId, client);
       
       // Unirse a las salas de chat del usuario
@@ -44,13 +59,21 @@ export class ChatsGateway implements OnGatewayConnection, OnGatewayDisconnect {
         client.join(chat.chatId);
       });
 
+      console.log(`Usuario ${userId} conectado al chat`);
+
     } catch (error) {
+      console.log('Error en conexión WebSocket:', error.message);
       client.disconnect();
     }
   }
 
   handleDisconnect(client: Socket) {
+    const userId = (client as any).userId;
     this.removeUserSocket(client);
+    
+    if (userId) {
+      console.log(`Usuario ${userId} desconectado del chat`);
+    }
   }
 
   @UseGuards(WsJwtGuard)
@@ -79,23 +102,45 @@ export class ChatsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { chatId: string; content: string },
   ) {
-    const { chatId, content } = data;
-    
-    // Aquí deberías crear el mensaje en la base de datos
-    // const message = await this.messagesService.create({
-    //   chatId,
-    //   content,
-    //   sender: userId,
-    // });
+    try {
+      const { chatId, content } = data;
+      const userId = (client as any).userId;
 
-    // Emitir el mensaje a todos los usuarios en el chat
-    this.server.to(chatId).emit('newMessage', {
-      chatId,
-      content,
-      // ...otros datos del mensaje
-    });
+      if (!userId) {
+        return { event: 'error', data: { message: 'Usuario no autenticado' } };
+      }
 
-    return { event: 'sendMessage', data: { chatId, content } };
+      // Crear el mensaje en la base de datos
+      const message = await this.messagesService.create({
+        chatId,
+        content,
+      }, userId);
+
+      // Emitir el mensaje a todos los usuarios en el chat
+      this.server.to(chatId).emit('newMessage', {
+        messageId: message._id,
+        chatId,
+        content: message.content,
+        sender: message.sender,
+        createdAt: (message as any).createdAt,
+        isRead: message.isRead,
+      });
+
+      return { 
+        event: 'sendMessage', 
+        data: { 
+          messageId: message._id,
+          chatId, 
+          content: message.content,
+          createdAt: (message as any).createdAt,
+        } 
+      };
+    } catch (error) {
+      return { 
+        event: 'error', 
+        data: { message: error.message || 'Error al enviar mensaje' } 
+      };
+    }
   }
 
   @UseGuards(WsJwtGuard)
@@ -105,11 +150,19 @@ export class ChatsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() data: { chatId: string; isTyping: boolean },
   ) {
     const { chatId, isTyping } = data;
+    const userId = (client as any).userId;
+    
     client.to(chatId).emit('userTyping', {
       chatId,
       isTyping,
-      userId: 'userId', // Reemplazar con el ID real del usuario
+      userId,
     });
+  }
+
+  @SubscribeMessage('getOnlineUsers')
+  async handleGetOnlineUsers(@ConnectedSocket() client: Socket) {
+    const onlineUsers = Array.from(this.userSockets.keys());
+    client.emit('onlineUsers', { users: onlineUsers });
   }
 
   private addUserSocket(userId: string, socket: Socket) {
@@ -119,15 +172,14 @@ export class ChatsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   private removeUserSocket(socket: Socket) {
-    for (const [userId, sockets] of this.userSockets.entries()) {
+    this.userSockets.forEach((sockets, userId) => {
       const index = sockets.indexOf(socket);
       if (index !== -1) {
         sockets.splice(index, 1);
         if (sockets.length === 0) {
           this.userSockets.delete(userId);
         }
-        break;
       }
-    }
+    });
   }
 } 
