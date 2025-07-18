@@ -58,9 +58,6 @@ export class CreateProductDto {
   @MaxLength(1000)
   description: string;
 
-  @IsString()
-  slug: string;
-
   @IsArray()
   @IsString({ each: true })
   @MinLength(1)

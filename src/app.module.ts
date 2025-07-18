@@ -12,6 +12,7 @@ import { CategoriesModule } from './categories/categories.module';
 import { SeederModule } from './seeder/seeder.module';
 import { OrdersModule } from './orders/orders.module';
 import { UploadModule } from './upload/upload.module';
+import { CartModule } from './cart/cart.module';
 
 @Module({
   imports: [
@@ -28,7 +29,8 @@ import { UploadModule } from './upload/upload.module';
     CategoriesModule,
     SeederModule,
     OrdersModule,
-    UploadModule
+    UploadModule,
+    CartModule
   ],
   controllers: [AppController],
   providers: [AppService],

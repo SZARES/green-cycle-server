@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Order, OrderStatus, PaymentStatus } from './entities/order.entity';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
@@ -124,18 +124,7 @@ export class OrdersService {
     });
   }
 
-  async cancelOrder(id: string, reason: string): Promise<Order> {
-    const order = await this.findOne(id);
-    
-    if (!order.canBeCancelled()) {
-      throw new BadRequestException('Esta orden no puede ser cancelada');
-    }
-
-    return this.update(id, {
-      status: OrderStatus.CANCELLED,
-      cancelReason: reason
-    });
-  }
+  
 
   async getOrderStats(): Promise<any> {
     const stats = await this.orderModel.aggregate([
@@ -175,5 +164,167 @@ export class OrdersService {
         }
       }
     ]);
+  }
+
+  // Métodos para vendedores
+
+  async getPendingSellerOrders(sellerId: string): Promise<Order[]> {
+    return this.orderModel
+      .find({ 
+        sellerId: new Types.ObjectId(sellerId), 
+        status: OrderStatus.PENDING 
+      })
+      .populate('buyerId', 'name email')
+      .populate('items.productId', 'name images')
+      .sort('-createdAt')
+      .exec();
+  }
+
+  async getAllSellerOrders(sellerId: string, status?: string): Promise<Order[]> {
+    const filter: any = { sellerId: new Types.ObjectId(sellerId) };
+    if (status) {
+      filter.status = status;
+    }
+    
+    return this.orderModel
+      .find(filter)
+      .populate('buyerId', 'name email')
+      .populate('items.productId', 'name images')
+      .sort('-createdAt')
+      .exec();
+  }
+
+  // Métodos para compradores
+
+  async getBuyerOrders(buyerId: string, status?: string): Promise<Order[]> {
+    const filter: any = { buyerId: new Types.ObjectId(buyerId) };
+    if (status) {
+      filter.status = status;
+    }
+    
+    return this.orderModel
+      .find(filter)
+      .populate('sellerId', 'name email')
+      .populate('items.productId', 'name images')
+      .sort('-createdAt')
+      .exec();
+  }
+
+  // Aprobar orden (vendedor)
+  async approveOrder(orderId: string, sellerId: string): Promise<Order> {
+    const order = await this.orderModel.findById(orderId);
+    
+    if (!order) {
+      throw new NotFoundException('Orden no encontrada');
+    }
+    
+    if (order.sellerId.toString() !== sellerId) {
+      throw new ForbiddenException('No tienes permiso para aprobar esta orden');
+    }
+    
+    if (order.status !== OrderStatus.PENDING) {
+      throw new BadRequestException('Solo se pueden aprobar órdenes pendientes');
+    }
+    
+    order.status = OrderStatus.CONFIRMED;
+    order.confirmedAt = new Date();
+    
+    return await order.save();
+  }
+
+  // Rechazar orden (vendedor)
+  async rejectOrder(orderId: string, sellerId: string, reason?: string): Promise<Order> {
+    const order = await this.orderModel.findById(orderId);
+    
+    if (!order) {
+      throw new NotFoundException('Orden no encontrada');
+    }
+    
+    if (order.sellerId.toString() !== sellerId) {
+      throw new ForbiddenException('No tienes permiso para rechazar esta orden');
+    }
+    
+    if (order.status !== OrderStatus.PENDING) {
+      throw new BadRequestException('Solo se pueden rechazar órdenes pendientes');
+    }
+    
+    order.status = OrderStatus.CANCELLED;
+    order.cancelReason = reason || 'Rechazado por el vendedor';
+    
+    return await order.save();
+  }
+
+  // Marcar como enviado (vendedor)
+  async markAsShipped(orderId: string, sellerId: string, trackingNumber?: string): Promise<Order> {
+    const order = await this.orderModel.findById(orderId);
+    
+    if (!order) {
+      throw new NotFoundException('Orden no encontrada');
+    }
+    
+    if (order.sellerId.toString() !== sellerId) {
+      throw new ForbiddenException('No tienes permiso para marcar esta orden como enviada');
+    }
+    
+    if (order.status !== OrderStatus.CONFIRMED && order.status !== OrderStatus.PREPARING) {
+      throw new BadRequestException('La orden debe estar confirmada o en preparación para ser enviada');
+    }
+    
+    order.status = OrderStatus.SHIPPED;
+    order.shippedAt = new Date();
+    if (trackingNumber) {
+      order.trackingNumber = trackingNumber;
+    }
+    
+    return await order.save();
+  }
+
+  // Marcar como entregado (comprador)
+  async markAsDelivered(orderId: string, buyerId: string): Promise<Order> {
+    const order = await this.orderModel.findById(orderId);
+    
+    if (!order) {
+      throw new NotFoundException('Orden no encontrada');
+    }
+    
+    if (order.buyerId.toString() !== buyerId) {
+      throw new ForbiddenException('No tienes permiso para marcar esta orden como entregada');
+    }
+    
+    if (order.status !== OrderStatus.SHIPPED) {
+      throw new BadRequestException('La orden debe estar enviada para ser marcada como entregada');
+    }
+    
+    order.status = OrderStatus.DELIVERED;
+    order.deliveredAt = new Date();
+    order.actualDeliveryDate = new Date();
+    
+    return await order.save();
+  }
+
+  // Cancelar orden (comprador o vendedor)
+  async cancelOrder(orderId: string, userId: string, reason?: string): Promise<Order> {
+    const order = await this.orderModel.findById(orderId);
+    
+    if (!order) {
+      throw new NotFoundException('Orden no encontrada');
+    }
+    
+    // Verificar permisos (comprador o vendedor)
+    const isBuyer = order.buyerId.toString() === userId;
+    const isSeller = order.sellerId.toString() === userId;
+    
+    if (!isBuyer && !isSeller) {
+      throw new ForbiddenException('No tienes permiso para cancelar esta orden');
+    }
+    
+    if (!order.canBeCancelled()) {
+      throw new BadRequestException('Esta orden no puede ser cancelada en su estado actual');
+    }
+    
+    order.status = OrderStatus.CANCELLED;
+    order.cancelReason = reason || (isBuyer ? 'Cancelado por el comprador' : 'Cancelado por el vendedor');
+    
+    return await order.save();
   }
 }

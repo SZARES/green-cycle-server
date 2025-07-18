@@ -27,9 +27,6 @@ export class Product extends Document {
   @Prop({ required: true, minlength: 10, maxlength: 1000 })
   description: string;
 
-  @Prop({ required: true, unique: true })
-  slug: string;
-
   @Prop({ type: [String], required: true, min: 1, max: 10 })
   images: string[];
 
@@ -188,6 +185,5 @@ ProductSchema.index({ status: 1, publishedAt: -1 });
 ProductSchema.index({ 'location.coordinates': '2dsphere' });
 ProductSchema.index({ 'location.city': 1, status: 1 });
 ProductSchema.index({ name: 'text', description: 'text', tags: 'text' });
-ProductSchema.index({ slug: 1 }, { unique: true });
 ProductSchema.index({ views: -1 });
 ProductSchema.index({ featuredUntil: 1 });

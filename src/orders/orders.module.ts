@@ -10,6 +10,6 @@ import { Order, OrderSchema } from './entities/order.entity';
   ],
   controllers: [OrdersController],
   providers: [OrdersService],
-  exports: [OrdersService]
+  exports: [OrdersService, MongooseModule]
 })
 export class OrdersModule {}

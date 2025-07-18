@@ -30,9 +30,6 @@ export class ProductsService {
       const product = new this.productModel(createProductDto);
       return await product.save();
     } catch (error) {
-      if (error.code === 11000) {
-        throw new BadRequestException('Ya existe un producto con ese slug');
-      }
       throw error;
     }
   }
@@ -84,9 +81,6 @@ export class ProductsService {
         }
       }
       
-      if (error.code === 11000) {
-        throw new BadRequestException('Ya existe un producto con ese slug');
-      }
       throw error;
     }
   }
@@ -213,31 +207,7 @@ export class ProductsService {
     return product;
   }
 
-  async findBySlug(slug: string) {
-    const product = await this.productModel
-      .findOne({ 
-        slug,
-        status: { $ne: ProductStatus.ARCHIVED }
-      })
-      .populate('category', 'name slug')
-      .populate('subcategory', 'name slug')
-      .populate('seller', 'name email');
 
-    if (!product) {
-      throw new NotFoundException(`Producto con slug ${slug} no encontrado`);
-    }
-
-    // Incrementar vistas
-    await this.productModel.findOneAndUpdate(
-      { slug },
-      {
-        $inc: { views: 1 },
-        lastViewedAt: new Date(),
-      },
-    );
-
-    return product;
-  }
 
   async update(id: string, updateProductDto: UpdateProductDto) {
     try {
@@ -252,9 +222,6 @@ export class ProductsService {
 
       return product;
     } catch (error) {
-      if (error.code === 11000) {
-        throw new BadRequestException('Ya existe un producto con ese slug');
-      }
       throw error;
     }
   }

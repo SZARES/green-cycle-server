@@ -13,6 +13,6 @@ import { CategoriesService } from 'src/categories/categories.service';
   ],
   controllers: [ProductsController],
   providers: [ProductsService, CategoriesService],
-  exports: [ProductsService, CategoriesService]
+  exports: [ProductsService, CategoriesService, MongooseModule]
 })
 export class ProductsModule {}

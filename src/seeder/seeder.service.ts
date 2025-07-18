@@ -67,11 +67,9 @@ export class SeederService {
 
   private generateProductData(category: Category, index: number) {
     const productName = `${category.name} Producto ${index + 1}`;
-    const slug = this.generateSlug(productName);
 
     return {
       name: productName,
-      slug,
       description: `Este es un producto ${category.name.toLowerCase()} eco-amigable de alta calidad. Diseñado pensando en la sostenibilidad y el medio ambiente.`,
       images: [
         'https://example.com/placeholder1.jpg',
@@ -138,7 +136,8 @@ export class SeederService {
         for (let i = 0; i < 10; i++) {
           const productData = this.generateProductData(category, i);
           const existingProduct = await this.productModel.findOne({
-            slug: productData.slug,
+            name: productData.name,
+            category: category._id,
           });
 
           if (!existingProduct) {
@@ -155,6 +154,35 @@ export class SeederService {
       return { message: 'Seeding completado exitosamente' };
     } catch (error) {
       console.error('Error durante el proceso de seeding:', error);
+      throw error;
+    }
+  }
+
+  async removeSlugFromProducts() {
+    try {
+      console.log('Iniciando migración para eliminar campo slug de productos...');
+      
+      // Primero eliminar el índice único del slug
+      try {
+        await this.productModel.collection.dropIndex('slug_1');
+        console.log('Índice slug_1 eliminado exitosamente');
+      } catch (indexError) {
+        console.log('El índice slug_1 no existe o ya fue eliminado');
+      }
+      
+      // Luego eliminar el campo slug de todos los documentos
+      const result = await this.productModel.updateMany(
+        {},
+        { $unset: { slug: "" } }
+      );
+      
+      console.log(`Migración completada. ${result.modifiedCount} productos actualizados.`);
+      return { 
+        message: 'Migración completada exitosamente',
+        modifiedCount: result.modifiedCount 
+      };
+    } catch (error) {
+      console.error('Error durante la migración:', error);
       throw error;
     }
   }

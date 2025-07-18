@@ -9,4 +9,9 @@ export class SeederController {
   async seed() {
     return this.seederService.seed();
   }
+
+  @Post('remove-slug')
+  async removeSlugFromProducts() {
+    return this.seederService.removeSlugFromProducts();
+  }
 } 
