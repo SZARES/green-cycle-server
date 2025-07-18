@@ -16,8 +16,8 @@ import { JwtModule } from '@nestjs/jwt';
       { name: Message.name, schema: MessageSchema }
     ]),
     JwtModule.register({
-      secret: process.env.JWT_SECRET || 'your-secret-key',
-      signOptions: { expiresIn: '1d' },
+      secret: process.env.JWT_SECRET || 'tu_clave_secreta_super_segura',
+      signOptions: { expiresIn: '24h' },
     }),
   ],
   controllers: [ChatsController, MessagesController],

@@ -103,7 +103,7 @@ export class ChatsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() data: { chatId: string; content: string },
   ) {
     try {
-      const { chatId, content } = data;
+    const { chatId, content } = data;
       const userId = (client as any).userId;
 
       if (!userId) {
@@ -116,15 +116,15 @@ export class ChatsGateway implements OnGatewayConnection, OnGatewayDisconnect {
         content,
       }, userId);
 
-      // Emitir el mensaje a todos los usuarios en el chat
-      this.server.to(chatId).emit('newMessage', {
+    // Emitir el mensaje a todos los usuarios en el chat
+    this.server.to(chatId).emit('newMessage', {
         messageId: message._id,
-        chatId,
+      chatId,
         content: message.content,
         sender: message.sender,
         createdAt: (message as any).createdAt,
         isRead: message.isRead,
-      });
+    });
 
       return { 
         event: 'sendMessage', 

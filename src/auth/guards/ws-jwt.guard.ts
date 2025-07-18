@@ -20,7 +20,13 @@ export class WsJwtGuard implements CanActivate {
       
       return true;
     } catch (err) {
-      throw new WsException('Token inválido');
+      console.error('Error en validación de token WebSocket:', err.message);
+      if (err.name === 'JsonWebTokenError') {
+        throw new WsException('Token inválido o mal formado');
+      } else if (err.name === 'TokenExpiredError') {
+        throw new WsException('Token expirado');
+      }
+      throw new WsException('Error en autenticación');
     }
   }
 } 
