@@ -69,6 +69,11 @@ export class ProductsController {
     return this.productsService.findAll(query);
   }
 
+  @Get('active')
+  findActive(@Query() query: any) {
+    return this.productsService.findActive(query);
+  }
+
   @Get('my-products')
   @UseGuards(JwtAuthGuard)
   findMyProducts(@Query() query: any, @Request() req) {

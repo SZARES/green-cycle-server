@@ -27,7 +27,7 @@ export enum OrderType {
 @Schema({ timestamps: true })
 export class Order extends Document {
     
-  @Prop({ required: true, unique: true, match: /^ORD-\d{4}-\d{6}$/ })
+  @Prop({ unique: true, match: /^ORD-\d{4}-\d{6}$/ })
   orderNumber: string;
 
   @Prop({ required: true, type: MongooseSchema.Types.ObjectId, ref: 'User' })
@@ -186,13 +186,4 @@ OrderSchema.index({ buyerId: 1, status: 1 });
 OrderSchema.index({ sellerId: 1, paymentStatus: 1 });
 OrderSchema.index({ createdAt: -1 });
 
-// Pre-save hook para generar orderNumber
-OrderSchema.pre('save', async function(next) {
-  if (this.isNew) {
-    const date = new Date();
-    const year = date.getFullYear();
-    const count = await (this.constructor as any).countDocuments();
-    this.orderNumber = `ORD-${year}-${String(count + 1).padStart(6, '0')}`;
-  }
-  next();
-});
+// Pre-save hook removido - orderNumber se maneja en el servicio

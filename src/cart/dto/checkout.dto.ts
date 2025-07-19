@@ -3,7 +3,11 @@ import { Type } from 'class-transformer';
 
 class ShippingAddressDto {
   @IsString()
-  address: string;
+  @IsOptional()
+  address?: string;
+
+  @IsString()
+  street: string;
 
   @IsString()
   city: string;
@@ -13,7 +17,11 @@ class ShippingAddressDto {
   state?: string;
 
   @IsString()
-  postalCode: string;
+  @IsOptional()
+  postalCode?: string;
+
+  @IsString()
+  zipCode: string;
 
   @IsString()
   @IsOptional()
@@ -37,4 +45,8 @@ export class CheckoutDto {
   @IsString()
   @IsOptional()
   notes?: string;
+
+  @IsString()
+  @IsOptional()
+  orderNumber?: string;
 } 

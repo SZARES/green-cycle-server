@@ -173,6 +173,89 @@ export class ProductsService {
     };
   }
 
+  async findActive(query: any = {}) {
+    const {
+      page = 1,
+      limit = 10,
+      sort = '-createdAt',
+      category,
+      minPrice,
+      maxPrice,
+      search,
+      location,
+      ecoBadges,
+      isHandmade,
+      isOrganic,
+      forBarter,
+    } = query;
+
+    const filter: any = {
+      status: ProductStatus.ACTIVE, // Solo productos activos
+    };
+
+    // Filtros básicos
+    if (category) {
+      filter.category = new Types.ObjectId(category);
+    }
+    if (minPrice || maxPrice) {
+      filter.price = {};
+      if (minPrice) filter.price.$gte = Number(minPrice);
+      if (maxPrice) filter.price.$lte = Number(maxPrice);
+    }
+    if (location) {
+      filter['location.city'] = new RegExp(location, 'i');
+    }
+    if (ecoBadges) {
+      filter.ecoBadges = { $in: ecoBadges.split(',') };
+    }
+    if (isHandmade !== undefined) {
+      filter.isHandmade = isHandmade === 'true';
+    }
+    if (isOrganic !== undefined) {
+      filter.isOrganic = isOrganic === 'true';
+    }
+    if (forBarter !== undefined) {
+      filter.forBarter = forBarter === 'true';
+    }
+
+    // Búsqueda por texto
+    if (search) {
+      filter.$or = [
+        { name: new RegExp(search, 'i') },
+        { description: new RegExp(search, 'i') },
+        { tags: new RegExp(search, 'i') },
+      ];
+    }
+
+    const skip = (Number(page) - 1) * Number(limit);
+    const sortOptions = sort.split(',').reduce((acc, curr) => {
+      const [field, order] = curr.startsWith('-') 
+        ? [curr.substring(1), -1] 
+        : [curr, 1];
+      acc[field] = order;
+      return acc;
+    }, {});
+
+    const [products, total] = await Promise.all([
+      this.productModel
+        .find(filter)
+        .sort(sortOptions)
+        .skip(skip)
+        .limit(Number(limit))
+        .populate('category', 'name slug')
+        .populate('subcategory', 'name slug')
+        .exec(),
+      this.productModel.countDocuments(filter),
+    ]);
+
+    return {
+      products,
+      total,
+      page: Number(page),
+      totalPages: Math.ceil(total / Number(limit)),
+    };
+  }
+
   async findOne(id: string) {
     const product = await this.productModel
       .findOne({ 

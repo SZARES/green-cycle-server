@@ -184,8 +184,18 @@ export class CartService {
         );
         const totalAmount = subtotal; // Sin impuestos ni envío por ahora
         
+        // Generar orderNumber si no se proporciona
+        let orderNumber = checkoutDto.orderNumber;
+        if (!orderNumber) {
+          const date = new Date();
+          const year = date.getFullYear();
+          const count = await this.orderModel.countDocuments();
+          orderNumber = `ORD-${year}-${String(count + 1).padStart(6, '0')}`;
+        }
+
         // Crear orden
         const orderData = {
+          orderNumber,
           buyerId: new Types.ObjectId(userId),
           sellerId: new Types.ObjectId(sellerId),
           items: items.map(item => ({
@@ -200,10 +210,10 @@ export class CartService {
           paymentStatus: PaymentStatus.PENDING,
           orderType: OrderType.PURCHASE,
           shippingAddress: {
-            street: checkoutDto.shippingAddress.address,
+            street: checkoutDto.shippingAddress.street,
             city: checkoutDto.shippingAddress.city,
             state: checkoutDto.shippingAddress.state || checkoutDto.shippingAddress.city,
-            zipCode: checkoutDto.shippingAddress.postalCode,
+            zipCode: checkoutDto.shippingAddress.zipCode,
             country: checkoutDto.shippingAddress.country || 'Perú',
           },
           paymentMethod: 'pending', // Se definirá después entre comprador y vendedor
