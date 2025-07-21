@@ -1,16 +1,23 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, Inject, forwardRef } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Message, MessageDocument } from './entities/message.entity';
 import { Chat, ChatDocument } from './entities/chat.entity';
 import { CreateMessageDto } from './dto/create-message.dto';
+import { ChatsGateway } from './chats.gateway';
 
 @Injectable()
 export class MessagesService {
+
+
   constructor(
     @InjectModel(Message.name) private messageModel: Model<MessageDocument>,
     @InjectModel(Chat.name) private chatModel: Model<ChatDocument>,
+    @Inject(forwardRef(() => ChatsGateway))
+    private readonly chatsGateway: ChatsGateway,
   ) {}
+
+
 
   async create(createMessageDto: CreateMessageDto, senderId: string): Promise<MessageDocument> {
     // Verificar que el chat existe y el usuario es participante
@@ -47,7 +54,32 @@ export class MessagesService {
     await this.updateUnreadCounts(createMessageDto.chatId, senderId);
 
     // Poblar el sender antes de retornar
-    return savedMessage.populate('sender', 'name email profileImage');
+    const populatedMessage = await savedMessage.populate('sender', 'name email profileImage');
+
+    // Emitir el mensaje a través del gateway
+    console.log('🔄 MessagesService: Intentando emitir mensaje');
+    console.log('📨 Datos del mensaje:', {
+      messageId: (populatedMessage as any)._id.toString(),
+      chatId: createMessageDto.chatId,
+      content: populatedMessage.content,
+    });
+    
+    if (this.chatsGateway) {
+      console.log('✅ ChatsGateway está disponible, emitiendo mensaje...');
+      this.chatsGateway.emitNewMessage({
+        messageId: (populatedMessage as any)._id.toString(),
+        chatId: createMessageDto.chatId,
+        content: populatedMessage.content,
+        sender: populatedMessage.sender,
+        createdAt: (populatedMessage as any).createdAt,
+        isRead: populatedMessage.isRead,
+      });
+      console.log('🚀 Mensaje emitido exitosamente');
+    } else {
+      console.log('❌ ChatsGateway NO está disponible');
+    }
+
+    return populatedMessage;
   }
 
   async findByChat(chatId: string, userId: string, page: number = 1, limit: number = 50): Promise<{

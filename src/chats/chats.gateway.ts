@@ -6,9 +6,10 @@ import {
   OnGatewayDisconnect,
   ConnectedSocket,
   MessageBody,
+  OnGatewayInit,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { UseGuards } from '@nestjs/common';
+import { UseGuards, Inject, forwardRef } from '@nestjs/common';
 import { WsJwtGuard } from '../auth/guards/ws-jwt.guard';
 import { ChatsService } from './chats.service';
 import { MessagesService } from './messages.service';
@@ -28,9 +29,12 @@ export class ChatsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   constructor(
     private readonly chatsService: ChatsService,
+    @Inject(forwardRef(() => MessagesService))
     private readonly messagesService: MessagesService,
     private readonly jwtService: JwtService,
   ) {}
+
+
 
   async handleConnection(client: Socket) {
     try {
@@ -103,28 +107,18 @@ export class ChatsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() data: { chatId: string; content: string },
   ) {
     try {
-    const { chatId, content } = data;
+      const { chatId, content } = data;
       const userId = (client as any).userId;
 
       if (!userId) {
         return { event: 'error', data: { message: 'Usuario no autenticado' } };
       }
 
-      // Crear el mensaje en la base de datos
+      // Crear el mensaje usando el servicio
       const message = await this.messagesService.create({
         chatId,
         content,
       }, userId);
-
-    // Emitir el mensaje a todos los usuarios en el chat
-    this.server.to(chatId).emit('newMessage', {
-        messageId: message._id,
-      chatId,
-        content: message.content,
-        sender: message.sender,
-        createdAt: (message as any).createdAt,
-        isRead: message.isRead,
-    });
 
       return { 
         event: 'sendMessage', 
@@ -181,5 +175,23 @@ export class ChatsGateway implements OnGatewayConnection, OnGatewayDisconnect {
         }
       }
     });
+  }
+
+  // Método público para emitir mensajes desde el servicio
+  emitNewMessage(messageData: {
+    messageId: string;
+    chatId: string;
+    content: string;
+    sender: any;
+    createdAt: Date;
+    isRead: boolean;
+  }) {
+    console.log('🎯 ChatsGateway.emitNewMessage() llamado');
+    console.log('📡 Emitiendo a chatId:', messageData.chatId);
+    console.log('💬 Contenido:', messageData.content);
+    
+    this.server.to(messageData.chatId).emit('newMessage', messageData);
+    
+    console.log('📤 Evento "newMessage" enviado a sala:', messageData.chatId);
   }
 } 
