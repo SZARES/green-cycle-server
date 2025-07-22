@@ -191,6 +191,10 @@ export class ProductsService {
 
     const filter: any = {
       status: ProductStatus.ACTIVE, // Solo productos activos
+      $or: [
+        { isUnlimitedStock: true }, // Productos con stock ilimitado
+        { stock: { $gt: 0 } }       // Productos con stock disponible (mayor a 0)
+      ]
     };
 
     // Filtros básicos

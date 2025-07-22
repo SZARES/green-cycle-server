@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException, ForbiddenException 
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Order, OrderStatus, PaymentStatus } from './entities/order.entity';
+import { Product, ProductStatus } from '../products/entities/product.entity';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
 
@@ -9,6 +10,7 @@ import { UpdateOrderDto } from './dto/update-order.dto';
 export class OrdersService {
   constructor(
     @InjectModel(Order.name) private readonly orderModel: Model<Order>,
+    @InjectModel(Product.name) private readonly productModel: Model<Product>,
   ) {}
 
   async create(createOrderDto: CreateOrderDto): Promise<Order> {
@@ -226,6 +228,34 @@ export class OrdersService {
       throw new BadRequestException('Solo se pueden aprobar órdenes pendientes');
     }
     
+    // Reducir stock de cada producto en la orden
+    for (const item of order.items) {
+      const product = await this.productModel.findById(item.productId);
+      
+      if (!product) {
+        throw new NotFoundException(`Producto con ID ${item.productId} no encontrado`);
+      }
+      
+      // Verificar stock disponible (solo si no es stock ilimitado)
+      if (!product.isUnlimitedStock) {
+        if (product.stock < item.quantity) {
+          throw new BadRequestException(
+            `Stock insuficiente para el producto "${product.name}". Stock disponible: ${product.stock}, cantidad solicitada: ${item.quantity}`
+          );
+        }
+        
+        // Reducir el stock
+        product.stock -= item.quantity;
+        
+        // Si el stock llega a 0, cambiar estado a out_of_stock
+        if (product.stock === 0) {
+          product.status = ProductStatus.OUT_OF_STOCK;
+        }
+        
+        await product.save();
+      }
+    }
+    
     order.status = OrderStatus.CONFIRMED;
     order.confirmedAt = new Date();
     
@@ -320,6 +350,25 @@ export class OrdersService {
     
     if (!order.canBeCancelled()) {
       throw new BadRequestException('Esta orden no puede ser cancelada en su estado actual');
+    }
+    
+    // Si la orden ya estaba confirmada, restaurar el stock
+    if (order.status === OrderStatus.CONFIRMED) {
+      for (const item of order.items) {
+        const product = await this.productModel.findById(item.productId);
+        
+        if (product && !product.isUnlimitedStock) {
+          // Restaurar el stock
+          product.stock += item.quantity;
+          
+          // Si el producto estaba agotado, cambiar estado a activo
+          if (product.status === ProductStatus.OUT_OF_STOCK) {
+            product.status = ProductStatus.ACTIVE;
+          }
+          
+          await product.save();
+        }
+      }
     }
     
     order.status = OrderStatus.CANCELLED;
