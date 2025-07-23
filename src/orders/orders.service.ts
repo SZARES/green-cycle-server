@@ -321,8 +321,14 @@ export class OrdersService {
       throw new ForbiddenException('No tienes permiso para marcar esta orden como entregada');
     }
     
-    if (order.status !== OrderStatus.SHIPPED) {
-      throw new BadRequestException('La orden debe estar enviada para ser marcada como entregada');
+    // Permitir marcar como entregada desde cualquier estado
+    // Solo verificar que no esté ya entregada o cancelada
+    if (order.status === OrderStatus.DELIVERED) {
+      throw new BadRequestException('La orden ya está marcada como entregada');
+    }
+    
+    if (order.status === OrderStatus.CANCELLED) {
+      throw new BadRequestException('No se puede marcar como entregada una orden cancelada');
     }
     
     order.status = OrderStatus.DELIVERED;
@@ -348,7 +354,9 @@ export class OrdersService {
       throw new ForbiddenException('No tienes permiso para cancelar esta orden');
     }
     
-    if (!order.canBeCancelled()) {
+    // Verificar si la orden puede ser cancelada
+    const cancellableStates = [OrderStatus.PENDING, OrderStatus.CONFIRMED, OrderStatus.PREPARING];
+    if (!cancellableStates.includes(order.status)) {
       throw new BadRequestException('Esta orden no puede ser cancelada en su estado actual');
     }
     

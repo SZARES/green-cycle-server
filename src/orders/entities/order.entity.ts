@@ -154,14 +154,14 @@ export class Order extends Document {
   }
 
   canBeCancelled(): boolean {
-    return [OrderStatus.PENDING, OrderStatus.CONFIRMED].includes(this.status);
+    return [OrderStatus.PENDING, OrderStatus.CONFIRMED, OrderStatus.PREPARING].includes(this.status);
   }
 
   updateStatus(newStatus: OrderStatus): boolean {
     const validTransitions = {
-      [OrderStatus.PENDING]: [OrderStatus.CONFIRMED, OrderStatus.CANCELLED],
-      [OrderStatus.CONFIRMED]: [OrderStatus.PREPARING, OrderStatus.CANCELLED],
-      [OrderStatus.PREPARING]: [OrderStatus.SHIPPED, OrderStatus.CANCELLED],
+      [OrderStatus.PENDING]: [OrderStatus.CONFIRMED, OrderStatus.CANCELLED, OrderStatus.DELIVERED],
+      [OrderStatus.CONFIRMED]: [OrderStatus.PREPARING, OrderStatus.CANCELLED, OrderStatus.DELIVERED],
+      [OrderStatus.PREPARING]: [OrderStatus.SHIPPED, OrderStatus.CANCELLED, OrderStatus.DELIVERED],
       [OrderStatus.SHIPPED]: [OrderStatus.DELIVERED, OrderStatus.RETURNED],
       [OrderStatus.DELIVERED]: [OrderStatus.RETURNED],
     };
