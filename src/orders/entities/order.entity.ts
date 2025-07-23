@@ -176,6 +176,32 @@ export class Order extends Document {
 
 export const OrderSchema = SchemaFactory.createForClass(Order);
 
+// Registrar métodos de instancia
+OrderSchema.methods.calculateTotal = function() {
+  this.subtotal = this.items.reduce((sum, item) => sum + item.totalPrice, 0);
+  this.totalAmount = this.subtotal + (this.taxes || 0) + (this.shippingCost || 0);
+};
+
+OrderSchema.methods.canBeCancelled = function() {
+  return [OrderStatus.PENDING, OrderStatus.CONFIRMED, OrderStatus.PREPARING].includes(this.status);
+};
+
+OrderSchema.methods.updateStatus = function(newStatus: OrderStatus): boolean {
+  const validTransitions = {
+    [OrderStatus.PENDING]: [OrderStatus.CONFIRMED, OrderStatus.CANCELLED, OrderStatus.DELIVERED],
+    [OrderStatus.CONFIRMED]: [OrderStatus.PREPARING, OrderStatus.CANCELLED, OrderStatus.DELIVERED],
+    [OrderStatus.PREPARING]: [OrderStatus.SHIPPED, OrderStatus.CANCELLED, OrderStatus.DELIVERED],
+    [OrderStatus.SHIPPED]: [OrderStatus.DELIVERED, OrderStatus.RETURNED],
+    [OrderStatus.DELIVERED]: [OrderStatus.RETURNED],
+  };
+
+  if (validTransitions[this.status]?.includes(newStatus)) {
+    this.status = newStatus;
+    return true;
+  }
+  return false;
+};
+
 // Índices
 OrderSchema.index({ buyerId: 1, createdAt: -1 });
 OrderSchema.index({ sellerId: 1, createdAt: -1 });

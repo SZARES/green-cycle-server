@@ -354,9 +354,7 @@ export class OrdersService {
       throw new ForbiddenException('No tienes permiso para cancelar esta orden');
     }
     
-    // Verificar si la orden puede ser cancelada
-    const cancellableStates = [OrderStatus.PENDING, OrderStatus.CONFIRMED, OrderStatus.PREPARING];
-    if (!cancellableStates.includes(order.status)) {
+    if (!order.canBeCancelled()) {
       throw new BadRequestException('Esta orden no puede ser cancelada en su estado actual');
     }
     
