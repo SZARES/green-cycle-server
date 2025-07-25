@@ -5,6 +5,7 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { IsObject } from 'class-validator';
+import { PublicReadThrottle, SearchThrottle } from '../auth/decorators/throttle.decorator';
 
 
 class CraeteProductFileDto {
@@ -65,11 +66,13 @@ export class ProductsController {
   }
 
   @Get()
+  @SearchThrottle()
   findAll(@Query() query: any) {
     return this.productsService.findAll(query);
   }
 
   @Get('active')
+  @SearchThrottle()
   findActive(@Query() query: any) {
     return this.productsService.findActive(query);
   }
@@ -96,6 +99,7 @@ export class ProductsController {
   }
 
   @Get(':id')
+  @PublicReadThrottle()
   findOne(@Param('id') id: string) {
     // Este endpoint es público para que cualquiera pueda ver productos
     return this.productsService.findOne(id);
