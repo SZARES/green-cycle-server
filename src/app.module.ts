@@ -1,6 +1,7 @@
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
@@ -13,6 +14,7 @@ import { SeederModule } from './seeder/seeder.module';
 import { OrdersModule } from './orders/orders.module';
 import { UploadModule } from './upload/upload.module';
 import { CartModule } from './cart/cart.module';
+import { BackupModule } from './backup/backup.module';
 import { LoggerMiddleware } from './middleware/logger.middleware';
 
 @Module({
@@ -20,6 +22,7 @@ import { LoggerMiddleware } from './middleware/logger.middleware';
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    ScheduleModule.forRoot(),
     MongooseModule.forRootAsync({
       useFactory: getMongoConfig,
     }),
@@ -31,7 +34,8 @@ import { LoggerMiddleware } from './middleware/logger.middleware';
     SeederModule,
     OrdersModule,
     UploadModule,
-    CartModule
+    CartModule,
+    BackupModule
   ],
   controllers: [AppController],
   providers: [AppService],

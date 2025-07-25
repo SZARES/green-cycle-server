@@ -1,4 +1,4 @@
-import { IsString, IsEmail, IsOptional, MinLength, IsArray, IsBoolean, IsObject, ValidateNested } from 'class-validator';
+import { IsString, IsEmail, IsOptional, MinLength, MaxLength, IsArray, IsBoolean, IsObject, ValidateNested, Matches } from 'class-validator';
 import { Type } from 'class-transformer';
 
 class SocialLinksDto {
@@ -32,7 +32,9 @@ export class CreateUserDto {
   email: string;
 
   @IsString()
-  @MinLength(8)
+  @MinLength(6)
+  @MaxLength(8)
+  @Matches(/^[^=]*$/)
   password: string;
 
   @IsOptional()
